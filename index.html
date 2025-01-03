@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebM変換ツール V3</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+            height: calc(100vh - 100px);
+        }
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .folder-select {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .folder-path {
+            font-size: 0.9em;
+            color: #666;
+            word-break: break-all;
+            margin-top: 5px;
+        }
+        .file-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+        .file-item {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .file-item:hover {
+            background-color: #f0f7ff;
+        }
+        .file-item.selected {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .video-container {
+            position: sticky;
+            top: 0;
+            background: #000;
+            padding-top: 56.25%; /* 16:9のアスペクト比 */
+            width: 100%;
+        }
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .controls-container {
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .convert-button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .convert-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .error {
+            background: #ffe6e6;
+            color: #cc0000;
+        }
+        .success {
+            background: #e6ffe6;
+            color: #006600;
+        }
+        .hidden {
+            display: none;
+        }
+        .folder-button {
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .folder-button:hover {
+            background: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebM変換ツール V3</h1>
+    <div class="container">
+        <div class="sidebar">
+            <div class="folder-select">
+                <button class="folder-button" onclick="selectFolder()">
+                    📁 フォルダを選択
+                </button>
+                <div id="current-folder" class="folder-path">現在のフォルダ</div>
+            </div>
+            <div class="file-list" id="file-list-container">
+                <!-- ファイル一覧がここに動的に挿入されます -->
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="video-container">
+                <video id="video-preview" controls>
+                    <p>ブラウザが動画の再生に対応していません。</p>
+                </video>
+            </div>
+            <div class="controls-container">
+                <div class="convert-form">
+                    <div class="form-group">
+                        <label for="output-name">出力ファイル名（拡張子なし）:</label>
+                        <input type="text" id="output-name" placeholder="出力ファイル名を入力">
+                    </div>
+                    <button id="convert-button" class="convert-button" disabled>変換開始</button>
+                </div>
+                <div id="status" class="status hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileListContainer = document.getElementById('file-list-container');
+        const videoPreview = document.getElementById('video-preview');
+        const outputName = document.getElementById('output-name');
+        const convertButton = document.getElementById('convert-button');
+        const status = document.getElementById('status');
+        const currentFolder = document.getElementById('current-folder');
+
+        let selectedFile = null;
+        let currentPath = '';
+
+        async function selectFolder() {
+            try {
+                const response = await fetch('/select-folder');
+                const result = await response.json();
+                if (result.success) {
+                    currentPath = result.path;
+                    currentFolder.textContent = currentPath;
+                    await loadFileList();
+                }
+            } catch (error) {
+                showStatus('フォルダの選択に失敗しました', 'error');
+            }
+        }
+
+        async function loadFileList() {
+            try {
+                const response = await fetch('/list-files');
+                const files = await response.json();
+                
+                fileListContainer.innerHTML = files.map(file => `
+                    <div class="file-item" data-file="${file}">
+                        ${file}
+                    </div>
+                `).join('');
+
+                document.querySelectorAll('.file-item').forEach(item => {
+                    item.addEventListener('click', handleFileSelect);
+                });
+            } catch (error) {
+                showStatus('ファイル一覧の取得に失敗しました', 'error');
+            }
+        }
+
+        function handleFileSelect(e) {
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            const fileItem = e.target;
+            fileItem.classList.add('selected');
+            selectedFile = fileItem.dataset.file;
+            
+            videoPreview.src = `/video/${selectedFile}`;
+            videoPreview.load();
+            
+            const defaultName = selectedFile.replace('.webm', '');
+            outputName.value = defaultName;
+            
+            convertButton.disabled = false;
+        }
+
+        convertButton.addEventListener('click', async () => {
+            if (!selectedFile || !outputName.value) return;
+
+            convertButton.disabled = true;
+            showStatus('変換中...', 'success');
+
+            try {
+                const response = await fetch('/convert', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        inputFile: selectedFile,
+                        outputName: outputName.value
+                    })
+                });
+
+                if (response.ok) {
+                    showStatus('変換が完了しました！', 'success');
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.error || '変換に失敗しました');
+                }
+            } catch (error) {
+                showStatus(`エラー: ${error.message}`, 'error');
+            } finally {
+                convertButton.disabled = false;
+            }
+        });
+
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.classList.remove('hidden');
+        }
+
+        // 初期化
+        loadFileList().then(() => {
+            fetch('/current-path')
+                .then(response => response.json())
+                .then(data => {
+                    currentPath = data.path;
+                    currentFolder.textContent = currentPath;
+                });
+        });
+    </script>
+</body>
+</html>

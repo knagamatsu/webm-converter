@@ -77,7 +77,7 @@ ffmpeg -i input.webm -vf "scale=ceil(iw/2)*2:ceil(ih/2)*2" -r 30 output.mp4
 
 ### GIF変換設定
 ```python
-ffmpeg -i input.webm -vf "fps=15,scale=640:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=single[p];[s1][p]paletteuse=new=1" output.gif
+ffmpeg -i input.webm -vf "fps=5,scale=640:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=single[p];[s1][p]paletteuse=new=1" output.gif
 ```
 - 15fps
 - 幅640px（高さは自動調整）

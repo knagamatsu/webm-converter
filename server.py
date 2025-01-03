@@ -85,7 +85,7 @@ def convert_video():
         # GIFへの変換
         subprocess.run([
             'ffmpeg', '-i', input_path,
-            '-vf', 'fps=15,scale=640:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=single[p];[s1][p]paletteuse=new=1',
+            '-vf', 'fps=5,scale=640:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=single[p];[s1][p]paletteuse=new=1',
             '-loop', '0',
             '-y',
             gif_output_path

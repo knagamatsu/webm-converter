@@ -4,12 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebM変換ツール V3</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: "Inter", "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
             margin: 0;
             padding: 0;
             background: #f9f9f9;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
         header {
             background: white;
@@ -30,7 +35,9 @@
         h1 {
             margin: 0;
             font-size: 24px;
-            color: #333;
+            color: #1a1a1a;
+            font-weight: 600;
+            letter-spacing: -0.5px;
         }
         .folder-controls {
             display: flex;
@@ -38,16 +45,17 @@
             gap: 10px;
         }
         .folder-button {
-            background: #f0f0f0;
-            border: 1px solid #ddd;
-            padding: 8px 15px;
-            border-radius: 4px;
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            padding: 10px 18px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
+            font-weight: 500;
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            transition: background-color 0.2s;
+            gap: 8px;
+            transition: all 0.2s;
         }
         .folder-button:hover {
             background: #e0e0e0;
@@ -73,15 +81,17 @@
         }
         .video-card {
             background: white;
-            border-radius: 8px;
+            border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            transition: all 0.2s;
             cursor: pointer;
+            border: 1px solid transparent;
         }
         .video-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            border-color: #e0e0e0;
         }
         .video-card.selected {
             box-shadow: 0 0 0 3px #2196f3;
@@ -203,18 +213,21 @@
             box-sizing: border-box;
         }
         .convert-button {
-            background: #2196f3;
+            background: #1a73e8;
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 4px;
+            padding: 12px 28px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 500;
-            transition: background-color 0.2s;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(26, 115, 232, 0.2);
         }
         .convert-button:hover {
-            background: #1976d2;
+            background: #1557b0;
+            box-shadow: 0 4px 8px rgba(26, 115, 232, 0.3);
+            transform: translateY(-1px);
         }
         .convert-button:disabled {
             background: #ccc;
@@ -257,6 +270,129 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* フォルダブラウザモーダル */
+        .folder-browser-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+        }
+        .folder-browser-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 12px;
+            padding: 0;
+            max-width: 90%;
+            width: 600px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+        .folder-browser-header {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .folder-browser-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        .folder-browser-path {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 14px;
+            color: #666;
+            word-break: break-all;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .path-up {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .path-up:hover {
+            background: #f0f0f0;
+        }
+        .folder-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .folder-item {
+            padding: 12px 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+        .folder-item:hover {
+            background: #f8f9fa;
+            border-color: #d0d0d0;
+        }
+        .folder-icon {
+            font-size: 20px;
+        }
+        .folder-name {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+        }
+        .folder-browser-footer {
+            padding: 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .folder-cancel-button, .folder-select-button {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .folder-cancel-button {
+            background: white;
+            border: 1px solid #ddd;
+            color: #666;
+        }
+        .folder-cancel-button:hover {
+            background: #f8f9fa;
+        }
+        .folder-select-button {
+            background: #1a73e8;
+            border: none;
+            color: white;
+        }
+        .folder-select-button:hover {
+            background: #1557b0;
+        }
     </style>
 </head>
 <body>
@@ -298,6 +434,29 @@
         </div>
     </div>
 
+    <!-- フォルダブラウザモーダル -->
+    <div id="folder-browser" class="folder-browser-modal">
+        <div class="folder-browser-content">
+            <div class="folder-browser-header">
+                <h3 class="folder-browser-title">フォルダを選択</h3>
+                <button class="close-button" onclick="closeFolderBrowser()">×</button>
+            </div>
+            <div class="folder-browser-path">
+                <button class="path-up" id="path-up" onclick="navigateUp()">
+                    ↑ 上のフォルダへ
+                </button>
+                <span id="browser-current-path"></span>
+            </div>
+            <div class="folder-list" id="folder-list">
+                <!-- フォルダ一覧がここに表示されます -->
+            </div>
+            <div class="folder-browser-footer">
+                <button class="folder-cancel-button" onclick="closeFolderBrowser()">キャンセル</button>
+                <button class="folder-select-button" onclick="selectCurrentFolder()">このフォルダを選択</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const videoGrid = document.getElementById('video-grid');
         const loading = document.getElementById('loading');
@@ -332,17 +491,94 @@
             return date.toLocaleDateString('ja-JP');
         }
 
-        async function selectFolder() {
+        // フォルダブラウザ関連
+        const folderBrowser = document.getElementById('folder-browser');
+        const folderList = document.getElementById('folder-list');
+        const browserCurrentPath = document.getElementById('browser-current-path');
+        const pathUpButton = document.getElementById('path-up');
+        let browserPath = '';
+
+        function selectFolder() {
+            // 初期パスを現在のフォルダに設定
+            browserPath = currentPath || '/home/posi';
+            openFolderBrowser();
+        }
+
+        async function openFolderBrowser() {
+            folderBrowser.style.display = 'block';
+            await browseFolders(browserPath);
+        }
+
+        function closeFolderBrowser() {
+            folderBrowser.style.display = 'none';
+        }
+
+        async function browseFolders(path) {
             try {
-                const response = await fetch('/select-folder');
+                const response = await fetch(`/browse-folders?path=${encodeURIComponent(path)}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    browserPath = result.current_path;
+                    browserCurrentPath.textContent = browserPath;
+                    
+                    // 上へボタンの表示/非表示
+                    if (result.parent_path) {
+                        pathUpButton.style.display = 'flex';
+                        pathUpButton.dataset.parentPath = result.parent_path;
+                    } else {
+                        pathUpButton.style.display = 'none';
+                    }
+                    
+                    // フォルダ一覧を表示
+                    folderList.innerHTML = result.items.map(item => `
+                        <div class="folder-item" onclick="navigateToFolder('${item.path.replace(/'/g, "\\'").replace(/"/g, '&quot;')}')">
+                            <span class="folder-icon">📁</span>
+                            <span class="folder-name">${item.name}</span>
+                        </div>
+                    `).join('');
+                    
+                    if (result.items.length === 0) {
+                        folderList.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">サブフォルダがありません</div>';
+                    }
+                }
+            } catch (error) {
+                console.error('フォルダ一覧の取得に失敗しました:', error);
+            }
+        }
+
+        function navigateToFolder(path) {
+            browseFolders(path);
+        }
+
+        function navigateUp() {
+            const parentPath = pathUpButton.dataset.parentPath;
+            if (parentPath) {
+                browseFolders(parentPath);
+            }
+        }
+
+        async function selectCurrentFolder() {
+            try {
+                const response = await fetch('/select-folder', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ path: browserPath })
+                });
+                
                 const result = await response.json();
                 if (result.success) {
                     currentPath = result.path;
                     currentFolder.textContent = currentPath;
+                    closeFolderBrowser();
                     await loadFileList();
+                } else {
+                    alert('フォルダの選択に失敗しました: ' + result.error);
                 }
             } catch (error) {
-                showStatus('フォルダの選択に失敗しました', 'error');
+                console.error('フォルダの選択に失敗しました:', error);
             }
         }
 
@@ -402,6 +638,12 @@
             
             status.classList.add('hidden');
             convertButton.disabled = false;
+            
+            // 入力フィールドにフォーカスを設定（少し遅延させる）
+            setTimeout(() => {
+                outputName.focus();
+                outputName.select();
+            }, 100);
         }
 
         function closeModal() {
@@ -414,6 +656,18 @@
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 closeModal();
+            }
+        });
+
+        // モーダルコンテンツ内のクリックイベントの伝播を止める
+        document.querySelector('.modal-content').addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // フォルダブラウザモーダルの外側クリックで閉じる
+        folderBrowser.addEventListener('click', (e) => {
+            if (e.target === folderBrowser) {
+                closeFolderBrowser();
             }
         });
 

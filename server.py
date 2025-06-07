@@ -1,10 +1,9 @@
 from flask import Flask, request, jsonify, send_file, send_from_directory
 import subprocess
 import os
-import tkinter as tk
-from tkinter import filedialog
 import hashlib
 import time
+import json
 
 app = Flask(__name__)
 
@@ -21,16 +20,23 @@ class Config:
 if not os.path.exists(Config.THUMBNAIL_DIR):
     os.makedirs(Config.THUMBNAIL_DIR)
 
-def select_folder_dialog():
-    """フォルダ選択ダイアログを表示"""
-    root = tk.Tk()
-    root.withdraw()  # メインウィンドウを非表示
-    folder = filedialog.askdirectory(
-        initialdir=Config.WORK_DIR,
-        title='変換するWebMファイルがあるフォルダを選択'
-    )
-    root.destroy()
-    return folder
+def get_directory_structure(path):
+    """ディレクトリ構造を取得"""
+    try:
+        items = []
+        for item in sorted(os.listdir(path)):
+            item_path = os.path.join(path, item)
+            if os.path.isdir(item_path):
+                # 隠しディレクトリは除外
+                if not item.startswith('.'):
+                    items.append({
+                        'name': item,
+                        'path': item_path,
+                        'type': 'directory'
+                    })
+        return items
+    except PermissionError:
+        return []
 
 def get_webm_files():
     """作業ディレクトリ内のWebMファイルを取得（詳細情報付き）"""
@@ -71,15 +77,36 @@ def get_current_path():
     """現在の作業ディレクトリを返す"""
     return jsonify({'path': Config.WORK_DIR})
 
-@app.route('/select-folder')
-def select_folder():
-    """フォルダ選択ダイアログを表示し、作業ディレクトリを更新"""
+@app.route('/browse-folders')
+def browse_folders():
+    """フォルダ一覧を返す"""
+    path = request.args.get('path', os.path.expanduser('~'))
     try:
-        folder = select_folder_dialog()
-        if folder:
+        # 親ディレクトリ情報
+        parent_path = os.path.dirname(path) if path != '/' else None
+        
+        # ディレクトリ一覧を取得
+        items = get_directory_structure(path)
+        
+        return jsonify({
+            'success': True,
+            'current_path': path,
+            'parent_path': parent_path,
+            'items': items
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/select-folder', methods=['POST'])
+def select_folder():
+    """作業ディレクトリを更新"""
+    try:
+        data = request.get_json()
+        folder = data.get('path')
+        if folder and os.path.exists(folder) and os.path.isdir(folder):
             Config.WORK_DIR = folder
             return jsonify({'success': True, 'path': Config.WORK_DIR})
-        return jsonify({'success': True, 'path': Config.WORK_DIR})  # フォルダ未選択の場合は現在のパスを返す
+        return jsonify({'success': False, 'error': 'Invalid folder path'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 

@@ -3,12 +3,23 @@ import subprocess
 import os
 import tkinter as tk
 from tkinter import filedialog
+import hashlib
+import time
 
 app = Flask(__name__)
 
 # グローバル変数として作業ディレクトリを保持
 class Config:
-    WORK_DIR = os.path.dirname(os.path.abspath(__file__))
+    # Ubuntuのデフォルトスクリーンキャストフォルダ
+    DEFAULT_SCREENCAST_DIR = os.path.expanduser("~/Videos/スクリーンキャスト")
+    # 初期作業ディレクトリ（スクリーンキャストフォルダが存在すればそれを使用）
+    WORK_DIR = DEFAULT_SCREENCAST_DIR if os.path.exists(DEFAULT_SCREENCAST_DIR) else os.path.dirname(os.path.abspath(__file__))
+    # サムネイルキャッシュディレクトリ
+    THUMBNAIL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.thumbnails')
+
+# サムネイルディレクトリを作成
+if not os.path.exists(Config.THUMBNAIL_DIR):
+    os.makedirs(Config.THUMBNAIL_DIR)
 
 def select_folder_dialog():
     """フォルダ選択ダイアログを表示"""
@@ -22,8 +33,34 @@ def select_folder_dialog():
     return folder
 
 def get_webm_files():
-    """作業ディレクトリ内のWebMファイルを取得"""
-    return [f for f in os.listdir(Config.WORK_DIR) if f.lower().endswith('.webm')]
+    """作業ディレクトリ内のWebMファイルを取得（詳細情報付き）"""
+    files = []
+    for f in os.listdir(Config.WORK_DIR):
+        if f.lower().endswith('.webm'):
+            file_path = os.path.join(Config.WORK_DIR, f)
+            stats = os.stat(file_path)
+            files.append({
+                'name': f,
+                'size': stats.st_size,
+                'modified': stats.st_mtime
+            })
+    return sorted(files, key=lambda x: x['modified'], reverse=True)
+
+def generate_thumbnail(video_path, output_path):
+    """動画からサムネイルを生成"""
+    try:
+        # ffmpegを使用して動画の1秒目からサムネイルを生成
+        subprocess.run([
+            'ffmpeg', '-i', video_path,
+            '-ss', '00:00:01',
+            '-vframes', '1',
+            '-vf', 'scale=320:-1',
+            '-y',
+            output_path
+        ], check=True, capture_output=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
 @app.route('/')
 def index():
@@ -50,6 +87,22 @@ def select_folder():
 def list_files():
     """WebMファイルの一覧を返す"""
     return jsonify(get_webm_files())
+
+@app.route('/thumbnail/<filename>')
+def get_thumbnail(filename):
+    """サムネイルを取得または生成"""
+    # ファイル名のハッシュをサムネイル名として使用
+    file_path = os.path.join(Config.WORK_DIR, filename)
+    file_hash = hashlib.md5(f"{filename}_{os.path.getmtime(file_path)}".encode()).hexdigest()
+    thumbnail_path = os.path.join(Config.THUMBNAIL_DIR, f"{file_hash}.jpg")
+    
+    # サムネイルが存在しない場合は生成
+    if not os.path.exists(thumbnail_path):
+        if not generate_thumbnail(file_path, thumbnail_path):
+            # サムネイル生成に失敗した場合は404を返す
+            return jsonify({'error': 'サムネイル生成エラー'}), 404
+    
+    return send_file(thumbnail_path, mimetype='image/jpeg')
 
 @app.route('/video/<filename>')
 def serve_video(filename):
